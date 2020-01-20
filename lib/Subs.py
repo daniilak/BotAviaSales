@@ -22,17 +22,30 @@ class Meta:
     order_by = ('id',)
 
 
-def add_subs(user_id, type_sub, type_sales, depart_date, return_date, origin, destination):
-    row = Aviasales_subs(
-        user_id=user_id,
-        type_sub=type_sub,
-        type_sales=type_sales,
-        depart_date=depart_date,
-        return_date=return_date,
-        origin=origin.strip(),
-        destination=destination.strip(),
-    )
-    row.save(force_insert=True)
+
+def add_subs(user_id, type_sub, origin, count_days, tmp_dates_from):
+    if len(tmp_dates_from) == 0:
+        return False
+    for date in tmp_dates_from.split("%"):
+        if len(date) > 0:
+            d_0, d_1, d_2 = date.split("_")
+            if len(d_1) == 0:
+                d_1 = "0" + d_1
+            if len(d_2) == 0:
+                d_2 = "0" + d_2
+            depart_date = "2020-" + d_1 + "-" + d_2
+            d = date.split("_")[1]
+            if len(d) == 0:
+                d = "0" + d
+            row = Aviasales_subs(
+                user_id=user_id,
+                type_sub=type_sub,
+                type_sales=type_sub,
+                depart_date=depart_date,
+                count_days=count_days,
+                origin=origin.strip(),
+            )
+            row.save(force_insert=True)
 
 
 def try_subs_by_user_id(user_id):

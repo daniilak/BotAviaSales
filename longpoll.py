@@ -32,7 +32,7 @@ while True:
                                          'wait': 25}).json()
     if longPoll.get('updates') and len(longPoll['updates']) != 0:
         for update in longPoll['updates']:
-
+            print(update)
             controller = Controller(update['object'])
             if update['object'].get('action'):
                 print(update['object']['action'])
@@ -46,3 +46,4 @@ while True:
         longPoll = api.groups.getLongPollServer(group_id=GROUP_ID)
         server, key, ts = longPoll['server'], longPoll['key'], longPoll['ts']
     ts = longPoll['ts']
+    print(ts)

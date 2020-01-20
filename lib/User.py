@@ -11,7 +11,8 @@ class User(BaseModel):
     tmp_type = TextField(null=False, default="")
     tmp_city = TextField(null=False, default="")
     tmp_dates_from = TextField(null=False, default="")
-    tmp_dates_to = TextField(null=False, default="")
+    tmp_day = TextField(null=False, default="2")
+    
     class Meta:
         db_table = "aviasales_users"
         order_by = ('id',)

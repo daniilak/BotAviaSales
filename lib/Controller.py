@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 import json
 import calendar
-from lib.User import add_user, try_user, find_user
 from lib.Subs import add_subs, try_subs_by_user_id, try_subs, find_subs
+from lib.User import add_user, try_user, find_user
 from lib.Requests import Requests
 
 keyboard = json.dumps({
@@ -42,7 +42,6 @@ class Controller:
 
         self.user = find_user(update_object['from_id'])
         self.text = update_object['text']
-        print(self.user.level, self.user.id)
 
         self.command = self.payloadParse()
         self.r = Requests(update_object['peer_id'])
@@ -89,46 +88,51 @@ class Controller:
     def adding(self):
         if self.isBack():
             return
-            # надо сохранить во временную, лучше в поле таблицы User
         self.user.level = 2
         self.user.tmp_type = self.command
         self.user.save()
         self.r.send_msg(
-            "Сохранено. Введите город отправления", k_null)
-        self.switchLevel(2)
+            "Сохранено. Введите город отправления в виде IATA кода. Например, MOW - Москва, KZN - Казань, LED - Санкт-Петербург, CSY - Чебоксары \nP.S.Это MVP. Не нравится - уходи", k_null)
 
-    def city(self):
+    def setDay(self):
         if self.isBack():
             return
         # Проверка города
         self.user.level = 3
         self.user.tmp_city = self.text
         self.user.save()
+        self.r.send_msg(
+            "Сохранено. Напишите числом сколько дней", k_null)
+
+    def city(self):
+        if self.isBack():
+            return
+        self.user.level = 4
+        self.user.tmp_day = self.text
+        self.user.tmp_dates_from = ""
+        self.user.save()
         # Лушче сделать календарь (отметьте)
         self.r.send_msg(
-            "Не сохранили, но выбрано. Введите даты отправления", self.monthRender())
-        self.switchLevel(3)
+            "Сохранено. Выберите в календаре даты, которые бот будет отслеживать как даты вылета. Можно выбрать несколько, например, все субботы января", self.monthRender())
 
     def dateFrom(self):
         if self.isBack():
             return
         # если нажата сохранить
         if self.command == "go_month":
-            self.r.send_msg("Вернулись к месяцам", self.monthRender())
+            self.r.send_msg("Выберите месяц", self.monthRender())
             return True
         if self.command == "save":
-            self.user.level = 4
+            self.user.level = 5
             self.user.save()
-            self.switchLevel(4)
-            self.r.send_msg("Не сохранили, но выбрано. Введите дату домой в формате ГГГГ-ММ-ДД", k_null)
+            self.switchLevel(5)
             return True
         splitted = self.command.split("_")
-        print(splitted)
         if splitted[0] == "mon":
-            self.r.send_msg("*Выбран месяц #{0}*".format(splitted[1]), self.daysRender(splitted[1]))
+            self.r.send_msg("*Выбран месяц #{0}*".format(self.getNameMonth(splitted[1])), self.daysRender(splitted[1]))
         if splitted[0] == "day":
             if splitted[1] == "X":
-                self.r.send_msg("Так низя", self.daysRender(splitted[2]))
+                self.r.send_msg("Так нельзя", self.daysRender(splitted[2]))
                 return True
             label = False
             if len(self.user.tmp_dates_from) > 0:
@@ -139,7 +143,7 @@ class Controller:
 
             if not label:
                 self.user.tmp_dates_from = self.user.tmp_dates_from  + "2020_{0}_{1}".format(splitted[2],splitted[1])
-                self.r.send_msg("*Выбран день #{0}*".format(splitted[1]), self.daysRender(splitted[2]))
+                self.r.send_msg("*Выбран день #{0} {1}*".format(splitted[1], self.getNameMonth(splitted[2])), self.daysRender(splitted[2]))
             else:
                 label = ""
                 for date in self.user.tmp_dates_from.split("%"):
@@ -159,7 +163,10 @@ class Controller:
         # Проверка даты
         self.user.level = 0
         self.user.save()
-        self.r.send_msg("ВСЁ ТИПА СОХРАНЕНО", k_null)
+        
+        add_subs(self.user.id, self.user.tmp_type, self.user.tmp_city, self.user.tmp_day, self.user.tmp_dates_from)
+
+        self.r.send_msg("Подписка новая добавлена, спасибо. Уведомления будут присылаться каждые полчаса. Фикс будет потом. ", k_null)
         # save to bd
         self.switchLevel(0)
 
@@ -169,10 +176,12 @@ class Controller:
         if level == 1:
             self.adding()
         if level == 2:
-            self.city()
+            self.setDay()
         if level == 3:
-            self.dateFrom()
+            self.city()
         if level == 4:
+            self.dateFrom()
+        if level == 5:
             self.dateTo()
 
     def payloadParse(self):
@@ -189,7 +198,12 @@ class Controller:
         for mon in month:
             buttons = []
             for m in mon:
-                buttons.append({"action": {"type": "text", "payload": "{\"button\": \"mon_" + str(i) + "\"}", "label": m}, "color": "secondary"})
+                label = "secondary"
+                if len(self.user.tmp_dates_from) > 0:
+                    for date in self.user.tmp_dates_from.split("%"):
+                        if int(date.split("_")[1]) == i:
+                            label = "positive"
+                buttons.append({"action": {"type": "text", "payload": "{\"button\": \"mon_" + str(i) + "\"}", "label": m}, "color": label})
                 i += 1
             k_month['buttons'].append(buttons)
         k_month['buttons'].append([{"action": {"type": "text", "payload": "{\"button\": \"save\"}", "label": "Сохранить"}, "color": "positive"}])
@@ -215,3 +229,7 @@ class Controller:
         kDays['buttons'].append([{"action": {"type": "text", "payload": "{\"button\": \"go_month\"}", "label": "К месяцам"}, "color": "primary"}])
         kDays['buttons'].append([{"action": {"type": "text", "payload": "{\"button\": \"save\"}", "label": "Сохранить"}, "color": "positive"}])
         return json.dumps(kDays)
+
+    def getNameMonth(self, id):
+        month = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"]
+        return month[int(id)]
