@@ -66,3 +66,9 @@ def find_subs(id):
     if not subs:
         return False
     return subs
+
+def get_subs():
+    try:
+        return Aviasales_subs.select(fn.date_add(Aviasales_subs.depart_date, NodeList((SQL('INTERVAL'), Aviasales_subs.count_days, SQL('DAY')))), Aviasales_subs.user_id, Aviasales_subs.depart_date, Aviasales_subs.depart_date, Aviasales_subs.origin)
+    except Aviasales_subs.DoesNotExist:
+        return False
